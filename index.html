@@ -47,41 +47,49 @@
             listDiv.innerHTML = `<p class="text-center text-slate-400 py-10 italic">Chargement des ${currentTab}...</p>`;
             
             try {
-                // Tente de récupérer la ressource principale
-                let res = await fetch(`${BASE_URL}/${currentTab}.json`);
-                let data = await res.json();
-                
-                // Secours : si la clé principale est vide pour les retraits, vérifie d'autres noms de dossiers
-                if (!data && currentTab === 'retraits') {
-                    const resAlt = await fetch(`${BASE_URL}/retraits_en_attente.json`);
-                    data = await resAlt.json();
+                let mergedData = {};
+
+                if (currentTab === 'recharges') {
+                    const res = await fetch(`${BASE_URL}/recharges.json`);
+                    mergedData = await res.json() || {};
+                } else {
+                    // Pour les retraits, charger à la fois "retraits" et "retraits_en_attente"
+                    const [res1, res2] = await Promise.all([
+                        fetch(`${BASE_URL}/retraits.json`),
+                        fetch(`${BASE_URL}/retraits_en_attente.json`)
+                    ]);
+                    const data1 = await res1.json() || {};
+                    const data2 = await res2.json() || {};
+                    
+                    // Fusion des deux nœuds Firebase
+                    mergedData = { ...data1, ...data2 };
                 }
 
-                if (!data || Object.keys(data).length === 0) {
+                const keys = Object.keys(mergedData);
+                if (keys.length === 0) {
                     listDiv.innerHTML = `<div class="text-center py-20 opacity-40"><i class="fa-solid fa-box-open text-4xl mb-2"></i><p>Aucune demande de ${currentTab}</p></div>`;
                     return;
                 }
 
-                const sortedIds = Object.keys(data).reverse();
+                const sortedIds = keys.reverse();
 
                 listDiv.innerHTML = sortedIds.map(id => {
-                    const req = data[id] || {};
-                    const statut = req.status || 'En attente';
+                    const req = mergedData[id] || {};
                     
-                    // Gestion robuste des champs pour éviter les erreurs NaN ou undefined
-                    const phone = req.phone || req.userPhone || req.user || req.userAccount || 'Inconnu';
-                    const rawMontant = req.montant !== undefined ? req.montant : (req.amount !== undefined ? req.amount : 0);
-                    const montantFormatted = (parseFloat(rawMontant) || 0).toLocaleString();
-                    const expediteurOuReceveur = req.expediteur || req.receveur || req.nom || 'N/A';
+                    // Mappage exact selon la structure Firebase (user, amount, receiverPhone, network)
+                    const phone = req.user || req.phone || req.userPhone || 'Inconnu';
+                    const rawMontant = req.amount !== undefined ? req.amount : (req.montant !== undefined ? req.montant : 0);
+                    const receiver = req.receiverPhone || req.receveur || req.expediteur || 'N/A';
+                    const network = req.network || req.reseau || 'Transfert';
                     const dateAffichage = req.date || 'Date inconnue';
-                    const reseauAffichage = req.reseau || req.network || 'Transfert';
+                    const statut = req.status || 'En attente';
 
                     let statusBadge = '';
                     let actionButtons = '';
 
-                    if (statut === 'Validé') {
+                    if (statut === 'Validé' || statut === 'Valide') {
                         statusBadge = `<span class="bg-green-100 text-green-700 px-2 py-1 rounded text-[9px] font-bold uppercase">Validé</span>`;
-                    } else if (statut === 'Rejeté') {
+                    } else if (statut === 'Rejeté' || statut === 'Refusé') {
                         statusBadge = `<span class="bg-red-100 text-red-700 px-2 py-1 rounded text-[9px] font-bold uppercase">Rejeté</span>`;
                     } else {
                         statusBadge = `<span class="bg-yellow-100 text-yellow-700 px-2 py-1 rounded text-[9px] font-bold uppercase">En attente</span>`;
@@ -104,12 +112,12 @@
                             <div class="flex justify-between items-start">
                                 <div>
                                     <p class="font-black text-slate-800 text-sm">Client: +${phone}</p>
-                                    <p class="text-[10px] text-slate-500 font-bold">${currentTab === 'recharges' ? 'Expéditeur' : 'Bénéficiaire'}: ${expediteurOuReceveur}</p>
+                                    <p class="text-[10px] text-slate-500 font-bold">${currentTab === 'recharges' ? 'Expéditeur' : 'Bénéficiaire'}: ${receiver}</p>
                                     <p class="text-[9px] text-slate-400 italic">${dateAffichage}</p>
                                 </div>
                                 <div class="text-right">
-                                    <p class="text-lg font-black text-slate-900">FC ${montantFormatted}</p>
-                                    <p class="text-[9px] font-bold text-[#ff6a00] uppercase mb-1">${reseauAffichage}</p>
+                                    <p class="text-lg font-black text-slate-900">FC ${parseFloat(rawMontant).toLocaleString()}</p>
+                                    <p class="text-[9px] font-bold text-[#ff6a00] uppercase mb-1">${network}</p>
                                     ${statusBadge}
                                 </div>
                             </div>
@@ -119,7 +127,7 @@
                 }).join('');
             } catch (e) {
                 console.error(e);
-                listDiv.innerHTML = "<p class='text-center text-red-500 font-bold'>Erreur de chargement des données</p>";
+                listDiv.innerHTML = "<p class='text-center text-red-500 font-bold'>Erreur lors de la récupération des données</p>";
             }
         }
 
@@ -130,20 +138,16 @@
             try {
                 const cleanPhone = phone.toString().replace('+', '').trim();
 
-                // 1. Mise à jour du solde utilisateur selon l'action et le type
+                // 1. Mise à jour du solde dans Firebase si validé
                 if (action === 'valider') {
                     const userRes = await fetch(`${BASE_URL}/users/${cleanPhone}.json`);
                     const user = await userRes.json();
 
                     if (user) {
                         let soldeActuel = parseFloat(user.balance) || 0;
-                        let nouveauSolde = soldeActuel;
-
-                        if (currentTab === 'recharges') {
-                            nouveauSolde = soldeActuel + parseFloat(montant);
-                        } else if (currentTab === 'retraits') {
-                            nouveauSolde = Math.max(0, soldeActuel - parseFloat(montant));
-                        }
+                        let nouveauSolde = currentTab === 'recharges' 
+                            ? soldeActuel + parseFloat(montant) 
+                            : Math.max(0, soldeActuel - parseFloat(montant));
 
                         await fetch(`${BASE_URL}/users/${cleanPhone}.json`, {
                             method: 'PATCH',
@@ -152,14 +156,20 @@
                     }
                 }
                 
-                // 2. Mettre à jour le statut dans la base de données
+                // 2. Mise à jour du statut dans les deux emplacements potentiels de retraits/recharges
                 const nouveauStatut = action === 'valider' ? 'Validé' : 'Rejeté';
-                await fetch(`${BASE_URL}/${currentTab}/${id}.json`, {
-                    method: 'PATCH',
-                    body: JSON.stringify({ status: nouveauStatut })
-                });
+                const patchData = JSON.stringify({ status: nouveauStatut });
 
-                // 3. Rafraîchir la liste
+                if (currentTab === 'recharges') {
+                    await fetch(`${BASE_URL}/recharges/${id}.json`, { method: 'PATCH', body: patchData });
+                } else {
+                    await Promise.all([
+                        fetch(`${BASE_URL}/retraits/${id}.json`, { method: 'PATCH', body: patchData }),
+                        fetch(`${BASE_URL}/retraits_en_attente/${id}.json`, { method: 'PATCH', body: patchData })
+                    ]);
+                }
+
+                // 3. Rafraîchissement de la liste
                 fetchRequests();
 
             } catch (e) {
