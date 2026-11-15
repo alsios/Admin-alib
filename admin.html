@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JANGFA | Panel Administration</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { background-color: #f8fafc; font-family: 'Poppins', sans-serif; margin: 0; padding-bottom: 100px; }
+        .admin-header {
+            background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
+            color: white; border-bottom-left-radius: 2.5rem; border-bottom-right-radius: 2.5rem;
+        }
+        .tab-btn { flex: 1; padding: 14px; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; transition: 0.25s; border-radius: 1rem; color: #64748b; }
+        .tab-active { background: #16a34a; color: white; box-shadow: 0 8px 15px rgba(22, 163, 74, 0.2); }
+        .request-card { background: white; border-radius: 1.8rem; padding: 20px; border: 1px solid #e2e8f0; margin-bottom: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.02); }
+        .glass-card { background: #ffffff; border-radius: 20px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+    </style>
+</head>
+<body>
+
+    <!-- Écran de Connexion Admin (Modal par défaut) -->
+    <div id="adminLoginModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl text-center">
+            <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-2xl mx-auto mb-4">
+                <i class="fa-solid fa-lock"></i>
+            </div>
+            <h2 class="text-xl font-black text-slate-900 uppercase mb-2">Espace Admin</h2>
+            <p class="text-xs text-slate-400 mb-6">Entrez le mot de passe administrateur pour continuer.</p>
+            <input type="password" id="adminPassword" placeholder="Mot de passe" class="w-full bg-slate-100 border border-slate-200 rounded-2xl px-4 py-3 text-center text-sm font-bold focus:outline-none focus:border-green-600 mb-4">
+            <button onclick="checkAdminPassword()" class="w-full bg-green-600 text-white font-black py-3 rounded-2xl uppercase text-xs shadow-lg shadow-green-600/30">Se connecter</button>
+        </div>
+    </div>
+
+    <!-- Header Principal -->
+    <div class="admin-header pt-14 pb-8 px-6 text-center shadow-xl mb-6">
+        <div class="w-12 h-12 bg-green-600 rounded-2xl flex items-center justify-center text-white mx-auto mb-3 shadow-md">
+            <i class="fa-solid fa-toolbox text-xl"></i>
+        </div>
+        <h1 class="text-xl font-black uppercase tracking-tight">Console de Contrôle</h1>
+        <p class="text-[9px] font-bold text-green-300 uppercase tracking-widest mt-1">Gestion JANGFA v1.0</p>
+    </div>
+
+    <div class="max-w-6xl mx-auto px-4 space-y-8">
+        
+        <!-- SECTION 1 : GESTION DES RECHARGES & RETRAITS -->
+        <div>
+            <!-- Switch de Navigation Interne -->
+            <div class="bg-white p-1.5 rounded-[1.2rem] flex mb-6 border border-slate-200 shadow-sm">
+                <button id="tabRecharges" onclick="switchAdminTab('recharges')" class="tab-btn tab-active">Dépôts</button>
+                <button id="tabRetraits" onclick="switchAdminTab('retraits')" class="tab-btn">Retraits</button>
+            </div>
+
+            <!-- Compteur rapide -->
+            <div class="mb-4 px-2 flex justify-between items-center">
+                <p class="text-[10px] font-black uppercase text-slate-400 tracking-wider">Demandes en attente</p>
+                <span id="queueCount" class="bg-green-100 text-green-600 font-black text-xs px-3 py-0.5 rounded-full">0</span>
+            </div>
+
+            <!-- Zone de Contenu dynamique (Transactions) -->
+            <div id="adminListContainer" class="min-h-[250px]">
+                <div class="text-center py-20 opacity-40">
+                    <i class="fa-solid fa-circle-notch fa-spin text-3xl text-green-600"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 2 : STATISTIQUES ET GESTION DES UTILISATEURS -->
+        <div class="space-y-6 pt-4 border-t border-slate-200">
+            <div class="flex justify-between items-center">
+                <h2 class="text-lg font-black uppercase text-slate-900">Base Utilisateurs</h2>
+                <button onclick="loadAdminData()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold transition-all">
+                    <i class="fa-solid fa-rotate mr-2"></i> Actualiser
+                </button>
+            </div>
+
+            <!-- Cartes Statistiques Globales -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="glass-card p-6 flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-2xl bg-green-50 text-green-600 flex items-center justify-center text-xl font-bold">
+                        <i class="fa-solid fa-users"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-bold text-slate-400 uppercase">Total Utilisateurs</p>
+                        <h3 id="statTotalUsers" class="text-2xl font-black text-slate-900">0</h3>
+                    </div>
+                </div>
+                <div class="glass-card p-6 flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl font-bold">
+                        <i class="fa-solid fa-wallet"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-bold text-slate-400 uppercase">Volume Soldes Global</p>
+                        <h3 id="statTotalSolde" class="text-2xl font-black text-blue-600">0 CDF</h3>
+                    </div>
+                </div>
+                <div class="glass-card p-6 flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl font-bold">
+                        <i class="fa-solid fa-chart-line"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-bold text-slate-400 uppercase">Revenu Cumulé Global</p>
+                        <h3 id="statTotalIncome" class="text-2xl font-black text-emerald-600">0 CDF</h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tableau Utilisateurs -->
+            <div class="glass-card p-6">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase">
+                                <th class="py-3 px-4">Téléphone</th>
+                                <th class="py-3 px-4">Niveau</th>
+                                <th class="py-3 px-4">Solde (CDF)</th>
+                                <th class="py-3 px-4">Parrain</th>
+                                <th class="py-3 px-4 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody" class="text-xs font-medium text-slate-700">
+                            <!-- Rempli dynamiquement par JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Raccourci vers la console Firebase -->
+    <div class="fixed bottom-5 left-5 z-40">
+        <a href="https://console.firebase.google.com/project/sonyy-9b565/database/sonyy-9b565-default-rtdb/data" target="_blank" class="flex items-center gap-2 bg-gray-900 text-white text-[10px] font-black uppercase tracking-wider px-4 py-3 rounded-xl shadow-xl border border-gray-800 active:scale-95 transition-all">
+            <i class="fa-solid fa-database text-green-400 text-xs"></i> 
+            Base de données
+        </a>
+    </div>
+
+    <!-- Chargement des modules Firebase Officiels -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, onValue, update, get, child, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        const firebaseConfig = {
+            databaseURL: "https://sonyy-9b565-default-rtdb.firebaseio.com"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        window.currentTab = 'recharges';
+        const ADMIN_PIN = "jangfa2026"; // Mot de passe admin modifiable ici
+
+        // Gestion du mot de passe
+        window.checkAdminPassword = function() {
+            const inputVal = document.getElementById('adminPassword').value;
+            if(inputVal === ADMIN_PIN) {
+                document.getElementById('adminLoginModal').style.display = 'none';
+                fetchRequests();
+                loadAdminData();
+            } else {
+                alert("❌ Mot de passe incorrect !");
+            }
+        }
+
+        // Navigation onglets Dépôts / Retraits
+        window.switchAdminTab = function(tab) {
+            window.currentTab = tab;
+            document.getElementById('tabRecharges').className = (tab === 'recharges' ? 'tab-btn tab-active' : 'tab-btn');
+            document.getElementById('tabRetraits').className = (tab === 'retraits' ? 'tab-btn tab-active' : 'tab-btn');
+            fetchRequests();
+        }
+
+        // Écoute en temps réel des transactions
+        window.fetchRequests = function() {
+            const container = document.getElementById('adminListContainer');
+            const dbRef = ref(db, window.currentTab);
+
+            onValue(dbRef, (snapshot) => {
+                container.innerHTML = "";
+                let pendingCount = 0;
+                const data = snapshot.val();
+
+                if (!data) {
+                    displayEmpty();
+                    document.getElementById('queueCount').innerText = "0";
+                    return;
+                }
+
+                for (let key in data) {
+                    const item = data[key];
+                    if (item && item.status === "EN ATTENTE") {
+                        pendingCount++;
+                        if (window.currentTab === 'recharges') {
+                            container.innerHTML += buildRechargeCard(key, item);
+                        } else {
+                            container.innerHTML += buildRetraitCard(key, item);
+                        }
+                    }
+                }
+
+                document.getElementById('queueCount').innerText = pendingCount;
+                if (pendingCount === 0) displayEmpty();
+            }, (error) => {
+                console.error(error);
+                container.innerHTML = `
+                    <div class="text-center py-10 px-4 bg-red-50 rounded-2xl border border-red-100">
+                        <i class="fa-solid fa-triangle-exclamation text-red-500 text-2xl mb-2"></i>
+                        <p class="text-red-700 text-xs font-bold">Erreur de synchronisation Firebase.</p>
+                    </div>`;
+            });
+        }
+
+        function displayEmpty() {
+            document.getElementById('adminListContainer').innerHTML = `
+                <div class="text-center py-16 opacity-30 border-2 border-dashed border-slate-200 rounded-[2rem] bg-white">
+                    <i class="fa-solid fa-circle-check text-4xl mb-2 text-slate-400"></i>
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Tout est à jour</p>
+                </div>`;
+        }
+
+        function buildRechargeCard(key, item) {
+            return `
+                <div class="request-card border-l-4 border-green-600">
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <p class="text-[9px] font-black text-slate-400 uppercase">Utilisateur : ${item.telephoneCompte || 'Inconnu'}</p>
+                            <h2 class="text-lg font-black text-slate-900">${parseFloat(item.montant || 0).toLocaleString()} CDF</h2>
+                        </div>
+                        <span class="bg-green-50 text-green-600 font-black text-[9px] px-2.5 py-1 rounded-md uppercase">${item.reseau || 'SMS'}</span>
+                    </div>
+                    <div class="bg-slate-50 p-3 rounded-xl mb-4 text-left border border-slate-100">
+                        <p class="text-[8px] font-black text-slate-400 uppercase mb-1">Expéditeur : ${item.numeroExpediteur || 'Non fourni'}</p>
+                        <p class="text-[10px] font-mono font-bold text-slate-700 leading-relaxed bg-white p-2 rounded-lg border border-slate-100 select-all">${item.messagePreuve || ''}</p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button onclick="processAction('recharges', '${key}', 'APPROUVÉ', '${item.userId}', ${item.montant})" class="bg-emerald-600 text-white text-[10px] font-black uppercase tracking-wider py-3 rounded-xl shadow-sm active:scale-95 transition-all">Approuver</button>
+                        <button onclick="processAction('recharges', '${key}', 'REJETÉ')" class="bg-rose-600 text-white text-[10px] font-black uppercase tracking-wider py-3 rounded-xl shadow-sm active:scale-95 transition-all">Rejeter</button>
+                    </div>
+                </div>`;
+        }
+
+        function buildRetraitCard(key, item) {
+            return `
+                <div class="request-card border-l-4 border-slate-900">
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <p class="text-[9px] font-black text-slate-400 uppercase">Compte : ${item.telephoneCompte || 'Inconnu'}</p>
+                            <h2 class="text-lg font-black text-rose-600">-${parseFloat(item.montant || 0).toLocaleString()} CDF</h2>
+                        </div>
+                        <span class="bg-slate-100 text-slate-800 font-black text-[9px] px-2.5 py-1 rounded-md uppercase">${item.retraitReseau || 'Mobile Money'}</span>
+                    </div>
+                    <div class="bg-slate-50 p-3 rounded-xl mb-4 text-left border border-slate-100">
+                        <p class="text-[8px] font-black text-slate-400 uppercase">Titulaire SIM : <span class="text-slate-900 font-bold">${item.receveurNom || 'Non renseigné'}</span></p>
+                        <p class="text-[11px] font-mono font-black text-slate-900 mt-1 select-all"><i class="fa-solid fa-phone-flip text-slate-400 mr-1"></i> ${item.receveurNum || 'N/A'}</p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button onclick="processAction('retraits', '${key}', 'APPROUVÉ')" class="bg-emerald-600 text-white text-[10px] font-black uppercase tracking-wider py-3 rounded-xl shadow-sm active:scale-95 transition-all">Valider Envoi</button>
+                        <button onclick="processAction('retraits', '${key}', 'REJETÉ', '${item.userId}', ${item.montant})" class="bg-rose-600 text-white text-[10px] font-black uppercase tracking-wider py-3 rounded-xl shadow-sm active:scale-95 transition-all">Rejeter (Restituer)</button>
+                    </div>
+                </div>`;
+        }
+
+        // Action sur les recharges et retraits
+        window.processAction = async function(endpoint, key, status, userId = null, montant = 0) {
+            const confirmation = confirm(`Voulez-vous marquer cette demande comme ${status} ?`);
+            if (!confirmation) return;
+
+            try {
+                const updates = {};
+                updates[`/${endpoint}/${key}/status`] = status;
+                await update(ref(db), updates);
+
+                if (endpoint === 'recharges' && status === 'APPROUVÉ' && userId) {
+                    const userSnapshot = await get(child(ref(db), `utilisateurs/${userId}`));
+                    if (userSnapshot.exists()) {
+                        const user = userSnapshot.val();
+                        const nouveauSolde = (user.solde || 0) + montant;
+                        const userUpdate = {};
+                        userUpdate[`/utilisateurs/${userId}/solde`] = nouveauSolde;
+                        await update(ref(db), userUpdate);
+                    }
+                }
+
+                if (endpoint === 'retraits' && status === 'REJETÉ' && userId) {
+                    const userSnapshot = await get(child(ref(db), `utilisateurs/${userId}`));
+                    if (userSnapshot.exists()) {
+                        const user = userSnapshot.val();
+                        const nouveauSolde = (user.solde || 0) + montant;
+                        const userUpdate = {};
+                        userUpdate[`/utilisateurs/${userId}/solde`] = nouveauSolde;
+                        await update(ref(db), userUpdate);
+                    }
+                }
+
+                alert(`Opération complétée avec succès !`);
+                fetchRequests();
+                loadAdminData();
+
+            } catch (e) {
+                alert("Erreur lors de l'exécution de l'action.");
+            }
+        }
+
+        // Chargement des utilisateurs globaux
+        window.loadAdminData = async function() {
+            try {
+                const res = await get(child(ref(db), `utilisateurs`));
+                const users = res.val();
+
+                const tbody = document.getElementById('usersTableBody');
+                tbody.innerHTML = "";
+
+                if(!users) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-slate-400">Aucun utilisateur trouvé.</td></tr>`;
+                    return;
+                }
+
+                let totalUsers = 0;
+                let sumSolde = 0;
+                let sumIncome = 0;
+
+                for (let id in users) {
+                    const u = users[id];
+                    totalUsers++;
+                    sumSolde += (u.solde || 0);
+                    sumIncome += (u.revenuCumule || 0);
+
+                    tbody.innerHTML += `
+                        <tr class="border-b border-slate-50 hover:bg-slate-50/50">
+                            <td class="py-4 px-4 font-bold text-slate-900">${u.telephone || '---'}</td>
+                            <td class="py-4 px-4"><span class="bg-green-100 text-green-700 px-2.5 py-1 rounded-full text-[10px] font-bold">${u.level || 'Lv1'}</span></td>
+                            <td class="py-4 px-4 font-bold text-blue-600">${(u.solde || 0).toLocaleString()} CDF</td>
+                            <td class="py-4 px-4 text-slate-400 font-mono">${u.parrain || 'Aucun'}</td>
+                            <td class="py-4 px-4 text-right space-x-2">
+                                <button onclick="editUserSolde('${id}', ${u.solde || 0})" class="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-xl font-bold text-[10px] hover:bg-blue-100">Modifier Solde</button>
+                                <button onclick="deleteUser('${id}')" class="bg-red-50 text-red-600 px-3 py-1.5 rounded-xl font-bold text-[10px] hover:bg-red-100">Supprimer</button>
+                            </td>
+                        </tr>
+                    `;
+                }
+
+                document.getElementById('statTotalUsers').innerText = totalUsers;
+                document.getElementById('statTotalSolde').innerText = sumSolde.toLocaleString() + " CDF";
+                document.getElementById('statTotalIncome').innerText = sumIncome.toLocaleString() + " CDF";
+
+            } catch (e) {
+                console.error("Erreur chargement admin", e);
+            }
+        }
+
+        window.editUserSolde = async function(userId, currentSolde) {
+            const newAmountStr = prompt("Entrez le nouveau solde pour cet utilisateur (en CDF) :", currentSolde);
+            if(newAmountStr === null) return;
+            const newSolde = parseFloat(newAmountStr);
+            if(isNaN(newSolde)) {
+                alert("Montant invalide !");
+                return;
+            }
+
+            try {
+                await update(ref(db), { [`/utilisateurs/${userId}/solde`]: newSolde });
+                alert("✅ Solde mis à jour avec succès !");
+                loadAdminData();
+            } catch(e) {
+                alert("Erreur lors de la mise à jour.");
+            }
+        }
+
+        window.deleteUser = async function(userId) {
+            if(!confirm("⚠️ Êtes-vous sûr de vouloir supprimer cet utilisateur ?")) return;
+            try {
+                await remove(ref(db, `utilisateurs/${userId}`));
+                alert("🗑️ Utilisateur supprimé.");
+                loadAdminData();
+            } catch(e) {
+                alert("Erreur lors de la suppression.");
+            }
+        }
+    </script>
+</body>
+</html>
